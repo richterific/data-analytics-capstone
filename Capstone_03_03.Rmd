@@ -1,0 +1,202 @@
+---
+title: "Riding Habits of Bike-Share Customers"
+author: "Adam Richter"
+date: "3/3/2022"
+output: html_document
+---
+## Introduction
+Cyclistic users fall into two categories: casual riders, who pay to rent bikes on an as-needed basis, and members, who pay a subscription fee for the service. This report will examine the habits of both types of customers in an effort to determine best practices for converting more casual riders into paying members. 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Volumes/home/Data Analyst Course")
+## Set Libraries ---- 
+library(dplyr)
+library(rio)
+library(rmarkdown)
+library(kableExtra)
+library(R.utils)
+library(tidyverse)
+library(tidyr)
+library(data.table)
+library(janitor)
+library(lubridate)
+```
+```{r get data, include = FALSE}
+## Get data ---- 
+jan22 <- read_csv("202201-divvy-tripdata.csv")
+dec21 <- read_csv("202112-divvy-tripdata.csv")
+nov21 <- read_csv("202111-divvy-tripdata.csv")
+oct21 <- read_csv("202110-divvy-tripdata.csv")
+sep21 <- read_csv("202109-divvy-tripdata.csv")
+aug21 <- read_csv("202108-divvy-tripdata.csv")
+jul21 <- read_csv("202107-divvy-tripdata.csv")
+jun21 <- read_csv("202106-divvy-tripdata.csv")
+may21 <- read_csv("202105-divvy-tripdata.csv")
+apr21 <- read_csv("202104-divvy-tripdata.csv")
+mar21 <- read_csv("202103-divvy-tripdata.csv")
+feb21 <- read_csv("202102-divvy-tripdata.csv")
+jan21 <- read_csv("202101-divvy-tripdata.csv")
+all_months <- rbind(feb21, mar21, apr21, may21, jun21, jul21, aug21, sep21, oct21, nov21, dec21, jan22)
+ridesq20 <- read_csv("Divvy_Trips_2020_Q1.csv")
+
+```
+## Initial observations
+#### Rental habits
+Casual riders take more rides than members on weekends, but members ride more during the week.
+```{r Clean, include=FALSE}
+cycl_filtered <- all_months %>%
+    filter(!is.na(start_station_id) & !is.na(end_station_id)) %>%
+    rename(rider_type = member_casual) %>%
+    mutate(ride_length = round((ended_at - started_at)),
+           day_of_week = as.double(wday(started_at)),
+           day = case_when(day_of_week == 1 ~ "Sunday",
+            day_of_week == 2 ~ "Monday",
+            day_of_week == 3 ~ "Tuesday",
+            day_of_week == 4 ~ "Wednesday",
+            day_of_week == 5 ~ "Thursday",
+            day_of_week == 6 ~ "Friday",
+            day_of_week == 7 ~ "Saturday"
+            ),
+           month = month(started_at),
+           year = year(started_at),
+           date = date(started_at),
+           same_day = case_when(
+             date(started_at) == date(ended_at) ~ "Yes",
+             date(started_at) != date(ended_at) ~ "No"
+           ),
+           ride_id = as.character(ride_id)) %>%
+  filter(ride_length > 0) %>%
+      glimpse()
+colnames(cycl_filtered)
+table(cycl_filtered$rider_type)
+str(cycl_filtered)
+nrow(cycl_filtered)
+all_trips <- cycl_filtered %>%
+  filter(start_station_name != "HQ QR" | ride_length > 0 & same_day == "Yes") %>%
+    glimpse()
+summary(all_trips$ride_length)
+all_trips_v2 <- all_trips %>%
+  group_by(rider_type, day) %>%
+  summarise(
+    avg_trip_length = round(mean(ride_length), digits = 0),
+    median_trip_length = round(median(ride_length), digits = 0),
+    longest_trip = max(ride_length),
+    shortest_trip = min(ride_length)
+  ) %>%
+  glimpse()
+aggregate(all_trips$ride_length ~ all_trips$rider_type + all_trips$day, FUN = mean)
+all_trips$day_of_week <- ordered(all_trips$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+all_trips_summary <- all_trips %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>%  #creates weekday field using wday()
+  group_by(rider_type, weekday) %>%  #groups by usertype and weekday
+  summarise(number_of_rides = n()							#calculates the number of rides and average duration 
+  ,average_duration = mean(ride_length)) %>% 		# calculates the average duration
+  arrange(rider_type, weekday) 
+write_csv(all_trips_summary, "all_trips.csv")
+trips_by_month <- all_trips %>%
+  group_by(rider_type, month) %>%
+  summarise(
+    avg_ride_length = mean(ride_length),
+    num_rides = n()
+  ) %>%
+  glimpse()
+write_csv(trips_by_month, "trips_by_month.csv")
+bike_type <- all_trips %>%
+  group_by(rider_type, rideable_type, day) %>%
+  summarise(
+    num_trips = n()
+  ) %>%
+    arrange(rider_type, day) %>%							# sorts
+  glimpse()
+write_csv(bike_type, "bike_type.csv")
+starting_point <- all_trips %>%
+  group_by(start_station_name, rider_type, month) %>%
+  summarise(
+    total_rides = n()
+  ) %>%
+  arrange(desc(total_rides)) %>%
+  glimpse()
+write_csv(starting_point, "starting_point.csv")
+```
+```{r riders by day, echo = FALSE}
+all_trips_plot1 <- all_trips %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(rider_type, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(rider_type, weekday)  %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = rider_type)) +
+  geom_col(position = "dodge") +
+  labs(title = "RIDERS BY DAY",
+       subtitle = "Members vs. Casual Riders",
+       
+       x = "Day of the week",
+       y = "Number of rides")
+all_trips_plot1
+```
+On all days of the week, though, casual riders take longer trips. 
+
+```{r summarise, include=FALSE}
+counts <- aggregate(all_trips$ride_length ~ all_trips$rider_type + all_trips$day, FUN = mean)
+glimpse(counts)
+write.csv(counts, 'avg_ride_length.csv')
+write_csv(all_trips_v2, "bike_trips_stats.csv")
+
+
+```
+
+```{r duration, echo=FALSE}
+all_trips %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(rider_type, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(rider_type, weekday)  %>% 
+  ggplot(aes(x = weekday, y = average_duration, fill = rider_type)) +
+  geom_col(position = "dodge") +
+  theme_light() + 
+  labs(title = "RIDE DURATION",
+       subtitle = "Members vs. Casual Riders",
+       x = "Day of the week",
+       y = "Average ride duration (seconds)")
+  
+
+
+```
+### Similarities
+Members take more trips than casual riders during the winter months (December, January, February), as shown in the chart below.
+One data point that should be shocking to no one is that both casual riders and members ride more often in the summer. 
+```{r months, echo=FALSE}
+months <- cycl_filtered %>%
+  mutate(month = month(started_at),
+         month = case_when(
+           month == 1 ~ "Jan",
+           month == 2 ~ "Feb",
+           month == 3 ~ "March",
+           month == 4 ~ "April",
+           month == 5 ~ "May",
+           month == 6 ~ "June",
+           month == 7 ~ "July",
+           month == 8 ~ "Aug",
+           month == 9 ~ "Sep",
+           month == 10 ~ "Oct",
+           month == 11 ~ "Nov",
+           month == 12 ~ "Dec")) %>%
+  # ordered(month, levels=c("Jan", "Feb", "March","April","May","June","July","Aug","Sep","Oct","Nov","Dec")) %>%
+    group_by(rider_type, month) %>%
+  summarise(
+    rides_per_month = n()
+  ) 
+months$month <- ordered(months$month, levels=c("Jan", "Feb", "March","April","May","June","July","Aug","Sep","Oct","Nov","Dec")) ## Reorder months
+months_plot <- months %>%
+  ggplot(aes(x = month, y = rides_per_month, fill = rider_type)) + 
+  geom_col(position = "dodge") +
+  theme_light() +
+ labs(title = "RIDES BY MONTH",
+       subtitle = "Members vs. Casual Riders",
+       x = "Month of the year",
+       y = "No. rides") 
+
+months_plot
+```
+
