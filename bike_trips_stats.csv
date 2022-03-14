@@ -1,0 +1,15 @@
+rider_type,day,avg_trip_length,median_trip_length,longest_trip,shortest_trip
+casual,Friday,1855,931,3341501,1
+casual,Monday,1959,1004,1900899,1
+casual,Saturday,2092,1111,3356649,1
+casual,Sunday,2255,1170,3235296,1
+casual,Thursday,1690,847,2946429,1
+casual,Tuesday,1725,884,2335375,1
+casual,Wednesday,1699,862,2337785,1
+member,Friday,766,570,89034,1
+member,Monday,761,557,88461,1
+member,Saturday,886,653,89738,1
+member,Sunday,909,659,89183,1
+member,Thursday,738,551,88005,1
+member,Tuesday,741,552,88345,1
+member,Wednesday,744,557,87634,1
