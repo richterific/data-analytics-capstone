@@ -12,4 +12,4 @@ I created three charts to show the differences between casual riders and members
 ### 5. Share
 I made csv files for each finding and uploaded them to Tableau to make charts. 
 ### 6. Act
-A Google Slides presentation puts the analysis in context and includes conclusions about the data and suggestions for next steps. 
+A PowerPoint presentation puts the analysis in context and includes conclusions about the data and suggestions for next steps. 
